@@ -2,6 +2,8 @@
 
 This is a portability library that allows one to fully override the standard debugger provided by their Common Lisp system for situations where binding `*debugger-hook*` is not enough - most notably, for `#'break`.
 
+Purpose: a basic building block that allows one to implement a portable, custom debugger for Common Lisp systems *in place* of the original system-provided one.
+
 ```lisp
 TRIVIAL-CUSTOM-DEBUGGER> (with-debugger ((lambda (condition hook)
                                            (declare (ignore hook))
