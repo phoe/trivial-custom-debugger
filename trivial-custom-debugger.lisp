@@ -38,47 +38,49 @@
   (assert (functionp hook))
   (macrolet ((named-lambda (name (&rest args) &body body)
                  `(labels ((,name ,args ,@body)) #',name)))
-    (flet ((make-hook (hook)
+    (flet (#-(or clisp allegro lispworks)
+           (make-hook (hook)
              (assert (functionp hook))
              (named-lambda invoke-hook (condition old-hook)
                (let (*debugger-hook*)
                  (funcall hook condition old-hook))))
            #+clisp
-           (make-clisp-hook (hook)
+           (make-hook (hook)
              (named-lambda break-driver (continuable &optional condition print)
                (declare (ignore continuable print))
                (let (*debugger-hook*)
                  (funcall hook condition hook))))
            #+allegro
-           (make-acl-hook (hook)
+           (make-hook (hook)
              (named-lambda break-hook (&rest args)
                (let ((condition (fifth args)))
                  (funcall hook condition hook))))
            #+lispworks
-           (make-lispworks-hook (hook)
+           (make-hook (hook)
              (list (named-lambda debugger-wrapper (function condition)
                      (declare (ignore function))
                      (funcall hook condition hook)))))
-      #+sbcl        (setf sb-ext:*invoke-debugger-hook* (make-hook hook))
-      #+ccl         (setf ccl:*break-hook* (make-hook hook))
-      #+ecl         (setf ext:*invoke-debugger-hook* (make-hook hook))
-      #+clasp       (setf ext:*invoke-debugger-hook* (make-hook hook))
-      #+abcl        (setf sys::*invoke-debugger-hook* (make-hook hook))
-      #+clisp       (setf sys::*break-driver* (make-clisp-hook hook))
-      #+allegro     (setf excl::*break-hook* (make-acl-hook hook))
-      #+lispworks   (setf dbg::*debugger-wrapper-list* (make-lispworks-hook hook)))))
+      (setf #+sbcl       sb-ext:*invoke-debugger-hook*
+            #+ccl        ccl:*break-hook*
+            #+ecl        ext:*invoke-debugger-hook*
+            #+clasp      ext:*invoke-debugger-hook*
+            #+abcl       sys::*invoke-debugger-hook*
+            #+clisp      sys::*break-driver*
+            #+allegro    excl::*break-hook*
+            #+lispworks  dbg::*debugger-wrapper-list*
+            (make-hook hook)))))
 
 (defun call-with-debugger (hook thunk)
   "Calls the provided thunk function in the dynamic environment where the
 provided hook function is set to be the system debugger."
-  (let (#+sbcl        sb-ext:*invoke-debugger-hook*
-        #+ccl         ccl:*break-hook*
-        #+ecl         ext:*invoke-debugger-hook*
-        #+clasp       ext:*invoke-debugger-hook*
-        #+abcl        sys::*invoke-debugger-hook*
-        #+clisp       sys::*break-driver*
-        #+allegro     excl::*break-hook*
-        #+lispworks   dbg::*debugger-wrapper-list*)
+  (let (#+sbcl       sb-ext:*invoke-debugger-hook*
+        #+ccl        ccl:*break-hook*
+        #+ecl        ext:*invoke-debugger-hook*
+        #+clasp      ext:*invoke-debugger-hook*
+        #+abcl       sys::*invoke-debugger-hook*
+        #+clisp      sys::*break-driver*
+        #+allegro    excl::*break-hook*
+        #+lispworks  dbg::*debugger-wrapper-list*)
     (install-debugger hook)
     (funcall thunk)))
 
