@@ -29,7 +29,7 @@
   :description "Allows arbitrary functions to become the standard Lisp debugger"
   :author "Michał \"phoe\" Herda <phoe@disroot.org>"
   :license  "MIT"
-  :version "0.0.1"
+  :version "1.0.0"
   :serial t
   :components ((:file "trivial-custom-debugger"))
   :in-order-to ((test-op (load-op #:trivial-custom-debugger/test)))
@@ -41,7 +41,7 @@
   :description "Tests for TRIVIAL-CUSTOM-DEBUGGER"
   :author "Michał \"phoe\" Herda <phoe@disroot.org>"
   :license  "MIT"
-  :version "0.0.1"
+  :version "1.0.0"
   :serial t
   :depends-on (#:parachute)
   :components ((:file "test"))
