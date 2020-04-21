@@ -25,37 +25,32 @@
 ;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
-(asdf:defsystem #:trivial-custom-debugger
-  :description "Allows arbitrary functions to become the standard Lisp debugger"
-  :author "Michał \"phoe\" Herda <phoe@disroot.org>"
-  :license  "MIT"
-  :version "1.0.0"
-  :serial t
-  :components ((:file "package")
-               (:file "sbcl" :if-feature :sbcl)
-               ;; (:if-feature :sbcl :file "sbcl")
-               ;; (:if-feature :ccl (:file "ccl"))
-               ;; (:if-feature :ecl (:file "ecl"))
-               ;; (:if-feature :clasp (:file "clasp"))
-               ;; (:if-feature :abcl (:file "abcl"))
-               ;; (:if-feature :clisp (:file "clisp"))
-               ;; (:if-feature :allegro (:file "allegro"))
-               ;; (:if-feature :lispworks (:file "lispworks"))
-               )
-  :in-order-to ((test-op (load-op #:trivial-custom-debugger/test)))
-  :perform
-  (test-op (o c)
-           (symbol-call "TRIVIAL-CUSTOM-DEBUGGER/TEST" "RUN-TESTS")))
+(in-package #:trivial-custom-debugger)
 
-(asdf:defsystem #:trivial-custom-debugger/test
-  :description "Tests for TRIVIAL-CUSTOM-DEBUGGER"
-  :author "Michał \"phoe\" Herda <phoe@disroot.org>"
-  :license  "MIT"
-  :version "1.0.0"
-  :serial t
-  :depends-on (#:trivial-custom-debugger
-               #:parachute)
-  :components ((:file "test"))
-  :perform
-  (test-op (o c)
-           (symbol-call "TRIVIAL-CUSTOM-DEBUGGER/TEST" "RUN-TESTS")))
+(defun install-debugger (hook)
+  "Sets the provided debugger hook function as the system debugger function."
+  (assert (functionp hook))
+  (macrolet ((named-lambda (name (&rest args) &body body)
+                 `(labels ((,name ,args ,@body)) #',name)))
+    (flet ((make-hook (hook)
+             (assert (functionp hook))
+             (named-lambda invoke-debugger-hook (condition old-hook)
+               (when (and *debugger-hook*
+                          (not (eq *debugger-hook* #'invoke-debugger-hook)))
+                 (funcall *debugger-hook* condition hook))
+               (funcall hook condition old-hook))))
+      (let ((hook (make-hook hook)))
+        (setf *debugger-hook* hook
+              ccl:*break-hook* hook)))))
+
+(defun call-with-debugger (hook thunk)
+  "Calls the provided thunk function in the dynamic environment where the
+provided hook function is set to be the system debugger."
+  (let (*debugger-hook* ccl:*break-hook*)
+    (install-debugger hook)
+    (funcall thunk)))
+
+(defmacro with-debugger ((hook) &body body)
+  "Executes the provided forms in the dynamic environment where the provided
+hook function is set to be the system debugger."
+  `(call-with-debugger ,hook (lambda () ,@body)))

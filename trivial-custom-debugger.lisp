@@ -41,15 +41,25 @@
     (flet (#-(or clisp allegro lispworks)
            (make-hook (hook)
              (assert (functionp hook))
-             (named-lambda invoke-hook (condition old-hook)
-               (let (*debugger-hook*)
+             (named-lambda invoke-debugger-hook (condition old-hook)
+               (let (*debugger-hook*
+                     #+sbcl       sb-ext:*invoke-debugger-hook*
+                     #+ccl        ccl:*break-hook*
+                     #+ecl        ext:*invoke-debugger-hook*
+                     #+clasp      ext:*invoke-debugger-hook*
+                     #+abcl       sys::*invoke-debugger-hook*
+                     #+clisp      sys::*break-driver*
+                     #+allegro    excl::*break-hook*
+                     #+lispworks  dbg::*debugger-wrapper-list*)
+                 (when (and *debugger-hook*
+                            (not (eq *debugger-hook* #'invoke-debugger-hook)))
+                   (funcall *debugger-hook* condition hook))
                  (funcall hook condition old-hook))))
            #+clisp
            (make-hook (hook)
              (named-lambda break-driver (continuable &optional condition print)
                (declare (ignore continuable print))
-               (let (*debugger-hook*)
-                 (funcall hook condition hook))))
+               (funcall hook condition hook)))
            #+allegro
            (make-hook (hook)
              (named-lambda break-hook (&rest args)
@@ -60,20 +70,26 @@
              (list (named-lambda debugger-wrapper (function condition)
                      (declare (ignore function))
                      (funcall hook condition hook)))))
-      (setf #+sbcl       sb-ext:*invoke-debugger-hook*
-            #+ccl        ccl:*break-hook*
-            #+ecl        ext:*invoke-debugger-hook*
-            #+clasp      ext:*invoke-debugger-hook*
-            #+abcl       sys::*invoke-debugger-hook*
-            #+clisp      sys::*break-driver*
-            #+allegro    excl::*break-hook*
-            #+lispworks  dbg::*debugger-wrapper-list*
-            (make-hook hook)))))
+      ;; TODO: bind these variables *inside* the hook function, too - maybe
+      ;; that will give us some actual testing consistency.
+      ;; TODO split into per-implementation backends
+      (let ((hook (make-hook hook)))
+        (setf *debugger-hook* hook
+              #+sbcl       sb-ext:*invoke-debugger-hook*
+              #+ccl        ccl:*break-hook*
+              #+ecl        ext:*invoke-debugger-hook*
+              #+clasp      ext:*invoke-debugger-hook*
+              #+abcl       sys::*invoke-debugger-hook*
+              #+clisp      sys::*break-driver*
+              #+allegro    excl::*break-hook*
+              #+lispworks  dbg::*debugger-wrapper-list*
+              hook)))))
 
 (defun call-with-debugger (hook thunk)
   "Calls the provided thunk function in the dynamic environment where the
 provided hook function is set to be the system debugger."
-  (let (#+sbcl       sb-ext:*invoke-debugger-hook*
+  (let (*debugger-hook*
+        #+sbcl       sb-ext:*invoke-debugger-hook*
         #+ccl        ccl:*break-hook*
         #+ecl        ext:*invoke-debugger-hook*
         #+clasp      ext:*invoke-debugger-hook*

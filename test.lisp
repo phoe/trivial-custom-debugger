@@ -32,54 +32,152 @@
 (in-package #:trivial-custom-debugger/test)
 
 (defun run-tests ()
-  (assert (test-error))
-  (assert (test-break))
-  (assert (test-signal))
-  (assert (test-invoke-debugger))
-  t)
+  (let ((failedp nil))
+    (macrolet ((test (form)
+                 `(loop with name = (car ',form)
+                        for (key value) in ,form
+                        do (format t "~&~30@S: ~S is ~S~%" name key value)
+                        unless value do (setf failedp t))))
+      (test (test-error))
+      (test (test-invoke-debugger))
+      (test (test-break))
+      (test (test-signal))
+      (test (test-error-hook))
+      (test (test-invoke-debugger-hook))
+      (test (test-break-hook))
+      (test (test-signal-hook))
+      (format t "~&~%                   ::: TEST SUITE ~A :::~%"
+              (if failedp "FAILED" "PASSED")))))
+
+;;; We verify whether HOOK is equal to the function passed to WITH-DEBUGGER.
+
+;;; We verify whether *DEBUGGER-HOOK* is equal to the function passed to
+;;; WITH-DEBUGGER - except for BREAK and SIGNAL, where we verify whether it is
+;;; null and that CONTINUE restarts are available.
+
+;;; Except for BREAK and SIGNAL, we verify whether CONDITION is eql to the
+;;; condition we have entered the debugger with.
+
+(defmacro null-debugger-hook ()
+  '(list :null-debugger-hook (null *debugger-hook*)))
+
+(defmacro t-debugger-hook ()
+  '(list :t-debugger-hook (not (null *debugger-hook*))))
+
+(defmacro t-debugger ()
+  '(list :t-debugger (not (null hook))))
+
+(defmacro eq-condition ()
+  '(list :eq-condition (eq original-condition condition)))
+
+(defmacro typep-condition ()
+  '(list :typep-condition (typep condition 'simple-error)))
+
+(defmacro string=-condition-report ()
+  '(list :string=-condition-report
+    (string= "Test 42" (princ-to-string condition))))
+
+(defmacro continue-restart-found ()
+  '(list :continue-restart-found
+    (not (not (find-restart 'continue condition)))))
+
+;;; Tests
+
+(defun make-test-condition ()
+  (make-condition 'simple-error :format-control "Test ~A"
+                                :format-arguments '(42)))
 
 (defun test-error ()
-  (labels ((hook (condition hook)
-             (declare (ignore hook))
-             (when (and (null *debugger-hook*)
-                        (typep condition 'simple-error)
-                        (string= "Test 42" (princ-to-string condition)))
-               (return-from test-error t))))
-    (trivial-custom-debugger:with-debugger (#'hook)
-      (error "Test ~A" 42))))
+  (let ((original-condition (make-test-condition)))
+    (labels ((debugger (condition hook)
+               (return-from test-error
+                 (list (t-debugger-hook)
+                       (t-debugger)
+                       (eq-condition)))))
+      (trivial-custom-debugger:with-debugger (#'debugger)
+        (error original-condition)))))
+
+(defun test-invoke-debugger ()
+  (let ((original-condition (make-test-condition)))
+    (labels ((debugger (condition hook)
+               (return-from test-invoke-debugger
+                 (list (t-debugger-hook)
+                       (t-debugger)
+                       (eq-condition)))))
+      (trivial-custom-debugger:with-debugger (#'debugger)
+        (let ((*break-on-signals* 'error))
+          (invoke-debugger original-condition))))))
 
 (defun test-break ()
-  (labels ((hook (condition hook)
-             (declare (ignore hook))
-             (when (and (null *debugger-hook*)
-                        (find-restart 'continue condition)
-                        (typep condition 'simple-condition)
-                        (string= "Test 42" (princ-to-string condition)))
-               (return-from test-break t))))
-    (trivial-custom-debugger:with-debugger (#'hook)
+  (labels ((debugger (condition hook)
+             (return-from test-break
+               (list (null-debugger-hook)
+                     (t-debugger)
+                     (continue-restart-found)
+                     (string=-condition-report)))))
+    (trivial-custom-debugger:with-debugger (#'debugger)
       (break "Test ~A" 42))))
 
 (defun test-signal ()
-  (labels ((hook (condition hook)
-             (declare (ignore hook))
-             (when (and (null *debugger-hook*)
-                        (find-restart 'continue condition))
-               (return-from test-signal t))))
-    (trivial-custom-debugger:with-debugger (#'hook)
+  (labels ((debugger (condition hook)
+             (declare (ignorable condition))
+             (return-from test-signal
+               (list (null-debugger-hook)
+                     (t-debugger)
+                     (continue-restart-found)))))
+    (trivial-custom-debugger:with-debugger (#'debugger)
       (let ((*break-on-signals* 'error))
-        (signal 'simple-error)))))
+        (signal (make-test-condition))))))
 
-(defun test-invoke-debugger ()
-  (labels ((hook (condition hook)
-             (declare (ignore hook))
-             (when (and (null *debugger-hook*)
-                        (typep condition 'simple-error)
-                        (string= "Test 42" (princ-to-string condition)))
-               (return-from test-invoke-debugger t))))
-    (trivial-custom-debugger:with-debugger (#'hook)
-      (let ((*break-on-signals* 'error))
-        (invoke-debugger (make-condition 'simple-error
-                                         :format-control "Test ~D"
-                                         :format-arguments '(42)))))))
+(defun test-error-hook ()
+  (labels ((debugger (condition hook)
+             (declare (ignore condition hook))
+             (return-from test-error-hook
+               '((:hook-before-debugger nil))))
+           (hook (condition hook)
+             (declare (ignore condition hook))
+             (return-from test-error-hook
+               '((:hook-before-debugger t)))))
+    (trivial-custom-debugger:with-debugger (#'debugger)
+      (let ((*debugger-hook* #'hook))
+        (error (make-test-condition))))))
 
-;; TODO test *DEBUGGER-HOOK* inside WITH-DEBUGGER
+(defun test-invoke-debugger-hook ()
+  (labels ((debugger (condition hook)
+             (declare (ignore condition hook))
+             (return-from test-invoke-debugger-hook
+               '((:hook-before-debugger nil))))
+           (hook (condition hook)
+             (declare (ignore condition hook))
+             (return-from test-invoke-debugger-hook
+               '((:hook-before-debugger t)))))
+    (trivial-custom-debugger:with-debugger (#'debugger)
+      (let ((*debugger-hook* #'hook))
+        (invoke-debugger (make-test-condition))))))
+
+(defun test-break-hook ()
+  (labels ((debugger (condition hook)
+             (declare (ignore condition hook))
+             (return-from test-break-hook
+               '((:debugger-before-hook t))))
+           (hook (condition hook)
+             (declare (ignore condition hook))
+             (return-from test-break-hook
+               '((:debugger-before-hook nil)))))
+    (trivial-custom-debugger:with-debugger (#'debugger)
+      (let ((*debugger-hook* #'hook))
+        (break "Test ~A" 42)))))
+
+(defun test-signal-hook ()
+  (labels ((debugger (condition hook)
+             (declare (ignore condition hook))
+             (return-from test-signal-hook
+               '((:debugger-before-hook t))))
+           (hook (condition hook)
+             (declare (ignore condition hook))
+             (return-from test-signal-hook
+               '((:debugger-before-hook nil)))))
+    (trivial-custom-debugger:with-debugger (#'debugger)
+      (let ((*break-on-signals* 'error)
+            (*debugger-hook* #'hook))
+        (signal (make-test-condition))))))

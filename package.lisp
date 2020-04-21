@@ -25,37 +25,8 @@
 ;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
-(asdf:defsystem #:trivial-custom-debugger
-  :description "Allows arbitrary functions to become the standard Lisp debugger"
-  :author "Michał \"phoe\" Herda <phoe@disroot.org>"
-  :license  "MIT"
-  :version "1.0.0"
-  :serial t
-  :components ((:file "package")
-               (:file "sbcl" :if-feature :sbcl)
-               ;; (:if-feature :sbcl :file "sbcl")
-               ;; (:if-feature :ccl (:file "ccl"))
-               ;; (:if-feature :ecl (:file "ecl"))
-               ;; (:if-feature :clasp (:file "clasp"))
-               ;; (:if-feature :abcl (:file "abcl"))
-               ;; (:if-feature :clisp (:file "clisp"))
-               ;; (:if-feature :allegro (:file "allegro"))
-               ;; (:if-feature :lispworks (:file "lispworks"))
-               )
-  :in-order-to ((test-op (load-op #:trivial-custom-debugger/test)))
-  :perform
-  (test-op (o c)
-           (symbol-call "TRIVIAL-CUSTOM-DEBUGGER/TEST" "RUN-TESTS")))
-
-(asdf:defsystem #:trivial-custom-debugger/test
-  :description "Tests for TRIVIAL-CUSTOM-DEBUGGER"
-  :author "Michał \"phoe\" Herda <phoe@disroot.org>"
-  :license  "MIT"
-  :version "1.0.0"
-  :serial t
-  :depends-on (#:trivial-custom-debugger
-               #:parachute)
-  :components ((:file "test"))
-  :perform
-  (test-op (o c)
-           (symbol-call "TRIVIAL-CUSTOM-DEBUGGER/TEST" "RUN-TESTS")))
+(defpackage #:trivial-custom-debugger
+  (:use #:cl)
+  (:export #:install-debugger
+           #:call-with-debugger
+           #:with-debugger))
