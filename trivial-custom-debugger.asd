@@ -43,7 +43,8 @@
   :license  "MIT"
   :version "1.0.0"
   :serial t
-  :depends-on (#:parachute)
+  :depends-on (#:trivial-custom-debugger 
+               #:parachute)
   :components ((:file "test"))
   :perform
   (test-op (o c)
