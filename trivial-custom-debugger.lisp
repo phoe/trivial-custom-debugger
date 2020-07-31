@@ -59,7 +59,13 @@
            (make-hook (hook)
              (list (named-lambda debugger-wrapper (function condition)
                      (declare (ignore function))
-                     (funcall hook condition hook)))))
+                     (funcall hook condition hook))))
+           #+mezzano
+           (make-hook (hook)
+             (assert (functionp hook))
+             (named-lambda invoke-hook (condition)
+               (let (*debugger-hook*)
+                 (funcall hook condition hook)))))
       (setf #+sbcl       sb-ext:*invoke-debugger-hook*
             #+ccl        ccl:*break-hook*
             #+ecl        ext:*invoke-debugger-hook*
@@ -68,6 +74,7 @@
             #+clisp      sys::*break-driver*
             #+allegro    excl::*break-hook*
             #+lispworks  dbg::*debugger-wrapper-list*
+            #+mezzano    mezzano.debug:*global-debugger*
             (make-hook hook)))))
 
 (defun call-with-debugger (hook thunk)
@@ -80,7 +87,8 @@ provided hook function is set to be the system debugger."
         #+abcl       sys::*invoke-debugger-hook*
         #+clisp      sys::*break-driver*
         #+allegro    excl::*break-hook*
-        #+lispworks  dbg::*debugger-wrapper-list*)
+        #+lispworks  dbg::*debugger-wrapper-list*
+        #+mezzano    mezzano.debug:*global-debugger*)
     (install-debugger hook)
     (funcall thunk)))
 
