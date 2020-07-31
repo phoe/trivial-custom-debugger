@@ -46,6 +46,6 @@ Inside `with-debugger` or after calling `install`:
 
 ## Tests
 
-Very roughly tested on SBCL, CCL, ECL, Clasp, ABCL, CLISP, ACL and LispWorks.
+Very roughly tested on SBCL, CCL, ECL, Clasp, ABCL, CLISP, ACL, LispWorks, and Mezzano.
 
 To run the test suite, evaluate `(asdf:test-system :trivial-custom-debugger)`.
