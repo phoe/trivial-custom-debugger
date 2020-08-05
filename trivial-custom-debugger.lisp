@@ -38,7 +38,7 @@
   (assert (functionp hook))
   (macrolet ((named-lambda (name (&rest args) &body body)
                  `(labels ((,name ,args ,@body)) #',name)))
-    (flet (#-(or clisp allegro lispworks)
+    (flet (#-(or clisp allegro lispworks mezzano)
            (make-hook (hook)
              (assert (functionp hook))
              (named-lambda invoke-hook (condition old-hook)
