@@ -75,6 +75,8 @@
             #+allegro    excl::*break-hook*
             #+lispworks  dbg::*debugger-wrapper-list*
             #+mezzano    mezzano.debug:*global-debugger*
+            #-(or sbcl ccl ecl clasp abcl clisp allegro lispworks mezzano)
+                         *debugger-hook*
             (make-hook hook)))))
 
 (defun call-with-debugger (hook thunk)
@@ -88,7 +90,9 @@ provided hook function is set to be the system debugger."
         #+clisp      sys::*break-driver*
         #+allegro    excl::*break-hook*
         #+lispworks  dbg::*debugger-wrapper-list*
-        #+mezzano    mezzano.debug:*global-debugger*)
+        #+mezzano    mezzano.debug:*global-debugger*
+        #-(or sbcl ccl ecl clasp abcl clisp allegro lispworks mezzano)
+                     *debugger-hook*)
     (install-debugger hook)
     (funcall thunk)))
 
