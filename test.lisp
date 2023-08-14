@@ -38,15 +38,16 @@
   (assert (test-invoke-debugger))
   t)
 
+(define-condition my-error (error) ())
+
 (defun test-error ()
   (labels ((debugger (condition hook)
              (declare (ignore hook))
              (when (and (null *debugger-hook*)
-                        (typep condition 'simple-error)
-                        (string= "Test 42" (princ-to-string condition)))
+                        (typep condition 'my-error))
                (return-from test-error t))))
     (trivial-custom-debugger:with-debugger (#'debugger)
-      (error "Test ~A" 42))))
+      (error 'my-error))))
 
 (defun test-break ()
   (labels ((debugger (condition hook)
@@ -67,17 +68,14 @@
                (return-from test-signal t))))
     (trivial-custom-debugger:with-debugger (#'debugger)
       (let ((*break-on-signals* 'error))
-        (signal 'simple-error)))))
+        (signal 'my-error)))))
 
 (defun test-invoke-debugger ()
   (labels ((debugger (condition hook)
              (declare (ignore hook))
              (when (and (null *debugger-hook*)
-                        (typep condition 'simple-error)
-                        (string= "Test 42" (princ-to-string condition)))
+                        (typep condition 'my-error))
                (return-from test-invoke-debugger t))))
     (trivial-custom-debugger:with-debugger (#'debugger)
       (let ((*break-on-signals* 'error))
-        (invoke-debugger (make-condition 'simple-error
-                                         :format-control "Test ~D"
-                                         :format-arguments '(42)))))))
+        (invoke-debugger (make-condition 'my-error))))))
